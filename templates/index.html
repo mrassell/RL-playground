@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tic Tac Toe - Q-Learning AI</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎮 Tic Tac Toe vs Q-Learning AI</h1>
+            <p>Play against an AI trained with reinforcement learning!</p>
+        </header>
+
+        <div class="game-info">
+            <div class="player-info">
+                <div class="player human">
+                    <span class="symbol">O</span>
+                </div>
+                <span class="vs">VS</span>
+                <div class="player ai">
+                    <span class="symbol">X</span>
+                </div>
+            </div>
+            <div class="status" id="status">Your turn - Click a cell to make your move</div>
+        </div>
+
+        <div class="game-board" id="gameBoard">
+            <div class="cell" data-position="0"></div>
+            <div class="cell" data-position="1"></div>
+            <div class="cell" data-position="2"></div>
+            <div class="cell" data-position="3"></div>
+            <div class="cell" data-position="4"></div>
+            <div class="cell" data-position="5"></div>
+            <div class="cell" data-position="6"></div>
+            <div class="cell" data-position="7"></div>
+            <div class="cell" data-position="8"></div>
+        </div>
+
+        <div class="controls">
+            <button id="resetBtn" class="btn btn-primary">New Game</button>
+            <button id="trainBtn" class="btn btn-secondary">Start Training</button>
+        </div>
+
+        <!-- Training Controls Panel -->
+        <div class="training-panel" id="trainingPanel">
+            <h3>🧠 Q-Learning Training Controls</h3>
+            
+            <div class="parameter-controls">
+                <div class="parameter-group">
+                    <label for="alphaSlider">Learning Rate (α): <span id="alphaValue">0.1</span></label>
+                    <input type="range" id="alphaSlider" min="0.01" max="0.5" step="0.01" value="0.1">
+                </div>
+                
+                <div class="parameter-group">
+                    <label for="gammaSlider">Discount Factor (γ): <span id="gammaValue">0.95</span></label>
+                    <input type="range" id="gammaSlider" min="0.1" max="0.99" step="0.01" value="0.95">
+                </div>
+                
+                <div class="parameter-group">
+                    <label for="epsSlider">Exploration Rate (ε): <span id="epsValue">0.1</span></label>
+                    <input type="range" id="epsSlider" min="0.01" max="0.5" step="0.01" value="0.1">
+                </div>
+                
+                <div class="parameter-group">
+                    <label for="episodesSlider">Training Episodes: <span id="episodesValue">10000</span></label>
+                    <input type="range" id="episodesSlider" min="1000" max="100000" step="1000" value="10000">
+                </div>
+            </div>
+            
+            <div class="training-controls">
+                <button id="startTrainingBtn" class="btn btn-success">Start Training</button>
+                <button id="stopTrainingBtn" class="btn btn-danger" disabled>Stop Training</button>
+                <button id="debugChartsBtn" class="btn btn-secondary">Debug Charts</button>
+            </div>
+        </div>
+
+        <!-- Training Progress Panel -->
+        <div class="training-progress" id="trainingProgress" style="display: none;">
+            <h3>📊 Training Progress</h3>
+            
+            <div class="progress-bar-container">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+                <span class="progress-text" id="progressText">0%</span>
+            </div>
+            
+            <div class="training-stats">
+                <div class="training-stat">
+                    <span class="stat-label">Episodes:</span>
+                    <span class="stat-value" id="trainingEpisodes">0 / 0</span>
+                </div>
+                <div class="training-stat">
+                    <span class="stat-label">Win Rate:</span>
+                    <span class="stat-value" id="trainingWinRate">0%</span>
+                </div>
+                <div class="training-stat">
+                    <span class="stat-label">Avg Reward:</span>
+                    <span class="stat-value" id="trainingAvgReward">0.00</span>
+                </div>
+                <div class="training-stat">
+                    <span class="stat-label">Wins:</span>
+                    <span class="stat-value" id="trainingWins">0</span>
+                </div>
+                <div class="training-stat">
+                    <span class="stat-label">Losses:</span>
+                    <span class="stat-value" id="trainingLosses">0</span>
+                </div>
+                <div class="training-stat">
+                    <span class="stat-label">Draws:</span>
+                    <span class="stat-value" id="trainingDraws">0</span>
+                </div>
+            </div>
+            
+            <div class="charts-container">
+                <div class="chart-section">
+                    <h4>📈 Win Rate Progress</h4>
+                    <canvas id="winRateChart" width="400" height="200"></canvas>
+                </div>
+                
+                <div class="chart-section">
+                    <h4>💰 Average Reward</h4>
+                    <canvas id="rewardChart" width="400" height="200"></canvas>
+                </div>
+                
+                <div class="chart-section">
+                    <h4>🧠 Q-Value Heatmap</h4>
+                    <div class="q-value-grid" id="qValueGrid">
+                        <div class="q-cell" data-position="0"></div>
+                        <div class="q-cell" data-position="1"></div>
+                        <div class="q-cell" data-position="2"></div>
+                        <div class="q-cell" data-position="3"></div>
+                        <div class="q-cell" data-position="4"></div>
+                        <div class="q-cell" data-position="5"></div>
+                        <div class="q-cell" data-position="6"></div>
+                        <div class="q-cell" data-position="7"></div>
+                        <div class="q-cell" data-position="8"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="performance-comparison">
+                <h4>⚡ Performance Comparison</h4>
+                <div class="comparison-stats">
+                    <div class="comparison-item">
+                        <span class="comparison-label">Before Training:</span>
+                        <span class="comparison-value" id="beforeWinRate">0%</span>
+                    </div>
+                    <div class="comparison-item">
+                        <span class="comparison-label">After Training:</span>
+                        <span class="comparison-value" id="afterWinRate">0%</span>
+                    </div>
+                    <div class="comparison-item">
+                        <span class="comparison-label">Improvement:</span>
+                        <span class="comparison-value improvement" id="improvement">+0%</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="training-milestones">
+                <h4>🎯 Training Milestones</h4>
+                <div class="milestones-container" id="milestonesContainer">
+                    <div class="milestone" data-threshold="10">10% Win Rate</div>
+                    <div class="milestone" data-threshold="25">25% Win Rate</div>
+                    <div class="milestone" data-threshold="50">50% Win Rate</div>
+                    <div class="milestone" data-threshold="75">75% Win Rate</div>
+                    <div class="milestone" data-threshold="90">90% Win Rate</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="game-stats">
+            <div class="stat">
+                <span class="stat-label">Games Played:</span>
+                <span class="stat-value" id="gamesPlayed">0</span>
+            </div>
+            <div class="stat">
+                <span class="stat-label">Your Wins:</span>
+                <span class="stat-value" id="humanWins">0</span>
+            </div>
+            <div class="stat">
+                <span class="stat-label">AI Wins:</span>
+                <span class="stat-value" id="aiWins">0</span>
+            </div>
+            <div class="stat">
+                <span class="stat-label">Draws:</span>
+                <span class="stat-value" id="draws">0</span>
+            </div>
+        </div>
+
+        <div class="info-panel">
+            <h3>How to Play</h3>
+            <ul>
+                <li>You are <strong>O</strong>, the AI is <strong>X</strong></li>
+                <li>Click any empty cell to make your move</li>
+                <li>Get three in a row to win!</li>
+                <li>The AI was trained with 50,000 games using Q-learning</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="modal" id="gameOverModal">
+        <div class="modal-content">
+            <h2 id="modalTitle">Game Over!</h2>
+            <p id="modalMessage"></p>
+            <div class="modal-actions">
+                <button id="playAgainBtn" class="btn btn-primary">Play Again</button>
+                <button id="closeModalBtn" class="btn btn-secondary">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/game.js') }}"></script>
+</body>
+</html>
