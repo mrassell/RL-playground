@@ -296,6 +296,10 @@ class TicTacToeGame {
         };
         
         try {
+            // Show loading state
+            this.status.textContent = 'Training in progress...';
+            this.progressText.textContent = 'Training...';
+            
             const response = await fetch('/train', {
                 method: 'POST',
                 headers: {
@@ -306,10 +310,21 @@ class TicTacToeGame {
             
             const result = await response.json();
             
-            if (result.status === 'training_started') {
-                this.startTrainingProgressMonitoring();
-            } else if (result.status === 'already_training') {
-                this.status.textContent = 'Training is already in progress!';
+            if (result.status === 'training_completed') {
+                // Training completed immediately (Vercel-compatible)
+                this.updateTrainingProgress(result.stats);
+                this.isTraining = false;
+                this.startTrainingBtn.disabled = false;
+                this.stopTrainingBtn.disabled = true;
+                this.status.textContent = 'Training completed!';
+                
+                // Force final chart update
+                this.updateCharts();
+            } else if (result.status === 'error') {
+                this.status.textContent = `Training error: ${result.message}`;
+                this.isTraining = false;
+                this.startTrainingBtn.disabled = false;
+                this.stopTrainingBtn.disabled = true;
             }
         } catch (error) {
             console.error('Error starting training:', error);
@@ -344,35 +359,7 @@ class TicTacToeGame {
         }
     }
 
-    startTrainingProgressMonitoring() {
-        console.log('🔄 Starting training progress monitoring');
-        this.trainingInterval = setInterval(async () => {
-            try {
-                console.log('🔄 Fetching training status...');
-                const response = await fetch('/training_status');
-                const stats = await response.json();
-                
-                console.log('📊 Training status received:', stats);
-                this.updateTrainingProgress(stats);
-                
-                if (!stats.is_training) {
-                    console.log('✅ Training completed!');
-                    this.isTraining = false;
-                    this.startTrainingBtn.disabled = false;
-                    this.stopTrainingBtn.disabled = true;
-                    clearInterval(this.trainingInterval);
-                    this.trainingInterval = null;
-                    this.status.textContent = 'Training completed!';
-                    
-                    // Force final chart update with all data
-                    console.log('📊 Final chart update with completed training data');
-                    this.updateCharts();
-                }
-            } catch (error) {
-                console.error('❌ Error fetching training status:', error);
-            }
-        }, 1000); // Check every second
-    }
+    // Removed startTrainingProgressMonitoring - not needed for Vercel batch training
 
     updateTrainingProgress(stats) {
         console.log('🔄 updateTrainingProgress called with stats:', stats);
