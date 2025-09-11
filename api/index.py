@@ -1,146 +1,379 @@
-from flask import Flask, request, jsonify
-from flask_cors import CORS
+from fastapi import FastAPI, HTTPException
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+from fastapi.responses import HTMLResponse
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 import numpy as np
 import random
 from collections import defaultdict
+import asyncio
+from typing import Dict, List, Optional
+import time
 
-app = Flask(__name__)
-CORS(app)
+app = FastAPI(title="Q-Learning Tic Tac Toe", version="1.0.0")
 
-# Simple Tic Tac Toe
+# CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Static files and templates
+app.mount("/static", StaticFiles(directory="static"), name="static")
+templates = Jinja2Templates(directory="templates")
+
+# -------------------------------
+# Tic Tac Toe Environment
+# -------------------------------
 class TicTacToe:
     def __init__(self):
-        self.board = [0] * 9
-        self.done = False
+        self.reset()
     
     def reset(self):
-        self.board = [0] * 9
+        self.board = np.zeros(9, dtype=int)
         self.done = False
-        return self.board
+        return tuple(self.board)
     
-    def check_winner(self):
-        lines = [(0,1,2), (3,4,5), (6,7,8), (0,3,6), (1,4,7), (2,5,8), (0,4,8), (2,4,6)]
-        for line in lines:
-            if self.board[line[0]] == self.board[line[1]] == self.board[line[2]] != 0:
-                return self.board[line[0]]
-        return 0 if 0 not in self.board else None
+    def check_winner(self, board):
+        combos = [(0,1,2),(3,4,5),(6,7,8),
+                  (0,3,6),(1,4,7),(2,5,8),
+                  (0,4,8),(2,4,6)]
+        for (i,j,k) in combos:
+            s = board[i] + board[j] + board[k]
+            if s == 3: return 1   # agent wins
+            if s == -3: return -1 # opponent wins
+        if not 0 in board:
+            return 0   # draw
+        return None
     
-    def step(self, action, player):
+    def step(self, action, player=1):
         if self.board[action] != 0 or self.done:
-            return self.board, -10, True
+            return tuple(self.board), -10, True
         self.board[action] = player
-        winner = self.check_winner()
+        winner = self.check_winner(self.board)
         if winner is not None:
             self.done = True
-            return self.board, winner, True
-        return self.board, 0, False
+            return tuple(self.board), winner, True
+        return tuple(self.board), 0, False
     
     def available_actions(self):
         return [i for i in range(9) if self.board[i] == 0]
 
-# Simple Q-Learning Agent
-class QAgent:
+    def get_board_state(self):
+        return self.board.tolist()
+
+# -------------------------------
+# Q-learning Agent
+# -------------------------------
+class QLearningAgent:
     def __init__(self):
         self.Q = defaultdict(float)
         self.alpha = 0.1
         self.gamma = 0.95
         self.eps = 0.1
         self.trained = False
+        self.training_stats = {
+            'episodes_completed': 0,
+            'total_episodes': 0,
+            'wins': 0,
+            'losses': 0,
+            'draws': 0,
+            'win_rate': 0.0,
+            'avg_reward': 0.0,
+            'is_training': False
+        }
+        self.training_task = None
     
-    def choose_action(self, state, available):
-        if not self.trained or random.random() < self.eps:
+    def set_parameters(self, alpha=None, gamma=None, eps=None):
+        if alpha is not None:
+            self.alpha = alpha
+        if gamma is not None:
+            self.gamma = gamma
+        if eps is not None:
+            self.eps = eps
+    
+    def get_q_value(self, state, action):
+        return self.Q.get((state, action), 0.0)
+    
+    def update_q_value(self, state, action, reward, next_state, available_actions):
+        if not available_actions:
+            max_next_q = 0
+        else:
+            max_next_q = max([self.get_q_value(next_state, a) for a in available_actions])
+        
+        current_q = self.get_q_value(state, action)
+        new_q = current_q + self.alpha * (reward + self.gamma * max_next_q - current_q)
+        self.Q[(state, action)] = new_q
+    
+    def choose_action(self, state, available, training_mode=True):
+        if not self.trained:
             return random.choice(available)
-        qvals = [self.Q.get((state, a), 0) for a in available]
-        maxq = max(qvals) if qvals else 0
-        best = [a for a in available if self.Q.get((state, a), 0) == maxq]
-        return random.choice(best) if best else random.choice(available)
+        elif training_mode and random.random() < self.eps:
+            return random.choice(available)
+        else:
+            qvals = [self.get_q_value(state, a) for a in available]
+            maxq = max(qvals) if qvals else 0
+            best = [a for a in available if self.get_q_value(state, a) == maxq]
+            return random.choice(best) if best else random.choice(available)
     
-    def train(self, episodes=1000):
+    async def train_async(self, episodes=1000):
+        """Async training that can run in background"""
+        print(f"🚀 Starting Q-learning training for {episodes} episodes...")
+        
+        self.training_stats['is_training'] = True
+        self.training_stats['total_episodes'] = episodes
+        self.training_stats['episodes_completed'] = 0
+        self.training_stats['wins'] = 0
+        self.training_stats['losses'] = 0
+        self.training_stats['draws'] = 0
+        
         env = TicTacToe()
+        total_reward = 0
+        q_updates = 0
+        
         for episode in range(episodes):
-            state = tuple(env.reset())
+            state = env.reset()
             done = False
+            episode_reward = 0
+            
             while not done:
+                # Agent move
                 available = env.available_actions()
                 if not available:
                     break
-                action = self.choose_action(state, available)
-                next_state, reward, done = env.step(action, 1)
+                    
+                action = self.choose_action(state, available, training_mode=True)
+                next_state, reward, done = env.step(action, player=1)
+                episode_reward += reward
+                
                 if done:
-                    self.Q[(state, action)] += self.alpha * (reward - self.Q[(state, action)])
+                    self.update_q_value(state, action, reward, next_state, [])
+                    q_updates += 1
+                    
+                    if reward == 1:
+                        self.training_stats['wins'] += 1
+                    elif reward == -1:
+                        self.training_stats['losses'] += 1
+                    else:
+                        self.training_stats['draws'] += 1
                     break
-                opp_action = random.choice(env.available_actions())
-                state_after_opp, opp_reward, done = env.step(opp_action, -1)
+                
+                # Opponent move
+                opp_available = env.available_actions()
+                if not opp_available:
+                    break
+                    
+                opp_action = random.choice(opp_available)
+                state_after_opp, opp_reward, done = env.step(opp_action, player=-1)
+                episode_reward += opp_reward
+                
                 if done:
-                    self.Q[(state, action)] += self.alpha * (-1 - self.Q[(state, action)])
+                    self.update_q_value(state, action, -1, state_after_opp, [])
+                    q_updates += 1
+                    self.training_stats['losses'] += 1
                     break
-                best_next = max([self.Q.get((tuple(state_after_opp), a), 0) for a in env.available_actions()] or [0])
-                self.Q[(state, action)] += self.alpha * (reward + self.gamma * best_next - self.Q[(state, action)])
-                state = tuple(state_after_opp)
+                
+                # Non-terminal state update
+                next_available = env.available_actions()
+                self.update_q_value(state, action, reward, state_after_opp, next_available)
+                q_updates += 1
+                
+                state = state_after_opp
+            
+            total_reward += episode_reward
+            self.training_stats['episodes_completed'] += 1
+            self.training_stats['win_rate'] = self.training_stats['wins'] / self.training_stats['episodes_completed']
+            self.training_stats['avg_reward'] = total_reward / self.training_stats['episodes_completed']
+            
+            # Epsilon decay
+            decay_factor = (episodes - episode) / episodes
+            min_eps = 0.01
+            initial_eps = 0.1
+            self.eps = max(min_eps, initial_eps * decay_factor)
+            
+            # Progress logging every 100 episodes
+            if (episode + 1) % 100 == 0:
+                print(f"📈 Episode {episode + 1}/{episodes} | "
+                      f"Win Rate: {self.training_stats['win_rate']:.1%} | "
+                      f"Q-Table: {len(self.Q)}")
+            
+            # Yield control to allow other tasks
+            if episode % 10 == 0:
+                await asyncio.sleep(0.001)
+        
+        # Training completed
         self.trained = True
         self.eps = 0.01
+        self.training_stats['is_training'] = False
+        
+        print(f"🎯 Training completed! Win rate: {self.training_stats['win_rate']:.1%}")
+        return self.training_stats.copy()
+    
+    def get_training_stats(self):
+        stats = self.training_stats.copy()
+        stats['q_table_size'] = len(self.Q)
+        return stats
 
 # Global state
-game = TicTacToe()
-agent = QAgent()
-agent.train(1000)  # Pre-train
+game_env = TicTacToe()
+agent = QLearningAgent()
 
-@app.route('/')
-def index():
-    return jsonify({
-        'message': 'Q-Learning Tic Tac Toe API',
-        'status': 'running',
-        'board': game.board,
-        'agent_trained': agent.trained
-    })
+# -------------------------------
+# Pydantic Models
+# -------------------------------
+class MoveRequest(BaseModel):
+    position: int
 
-@app.route('/reset', methods=['POST'])
-def reset():
-    game.reset()
-    return jsonify({'board': game.board, 'game_over': False})
+class TrainingRequest(BaseModel):
+    episodes: int = 1000
+    alpha: float = 0.1
+    gamma: float = 0.95
+    eps: float = 0.1
 
-@app.route('/move', methods=['POST'])
-def move():
-    data = request.json
-    position = data.get('position', 0)
+# -------------------------------
+# API Routes
+# -------------------------------
+@app.get("/")
+async def read_root():
+    return {
+        "message": "Q-Learning Tic Tac Toe API",
+        "status": "running",
+        "endpoints": [
+            "/training_status - GET - Get training stats",
+            "/train - POST - Start training",
+            "/move - POST - Make a move",
+            "/reset - POST - Reset game",
+            "/q_values - GET - Get Q-values",
+            "/agent_status - GET - Get agent status"
+        ],
+        "docs": "/docs",
+        "note": "This is the API backend. The frontend interface is not available on Vercel due to template limitations."
+    }
+
+@app.post("/reset")
+async def reset_game():
+    game_env.reset()
+    return {
+        "board": game_env.get_board_state(),
+        "game_over": False,
+        "winner": None
+    }
+
+@app.post("/move")
+async def make_move(request: MoveRequest):
+    position = request.position
     
     # Human move
-    board, reward, done = game.step(position, -1)
-    result = {'board': board, 'game_over': done, 'winner': None}
+    state, reward, done = game_env.step(position, player=-1)
+    
+    result = {
+        "board": game_env.get_board_state(),
+        "game_over": done,
+        "winner": None,
+        "message": ""
+    }
     
     if done:
-        result['winner'] = 'human' if reward == -1 else 'draw' if reward == 0 else 'agent'
-        return jsonify(result)
+        if reward == -1:
+            result["winner"] = "human"
+            result["message"] = "You win!"
+        elif reward == 0:
+            result["winner"] = "draw"
+            result["message"] = "It's a draw!"
+        else:
+            result["winner"] = "agent"
+            result["message"] = "Agent wins!"
+        return result
     
     # Agent move
-    available = game.available_actions()
+    available = game_env.available_actions()
     if available:
-        action = agent.choose_action(tuple(board), available)
-        board, reward, done = game.step(action, 1)
-        result.update({'board': board, 'game_over': done, 'agent_move': action})
+        action = agent.choose_action(tuple(game_env.board), available, training_mode=False)
+        state, reward, done = game_env.step(action, player=1)
+        
+        result["board"] = game_env.get_board_state()
+        result["agent_move"] = action
+        result["game_over"] = done
+        
         if done:
-            result['winner'] = 'agent' if reward == 1 else 'draw' if reward == 0 else 'human'
+            if reward == 1:
+                result["winner"] = "agent"
+                result["message"] = "Agent wins!"
+            elif reward == 0:
+                result["winner"] = "draw"
+                result["message"] = "It's a draw!"
+            else:
+                result["winner"] = "human"
+                result["message"] = "You win!"
     
-    return jsonify(result)
+    return result
 
-@app.route('/training_status', methods=['GET'])
-def training_status():
-    return jsonify({
-        'trained': agent.trained,
-        'q_table_size': len(agent.Q),
-        'eps': agent.eps
-    })
+@app.post("/train")
+async def start_training(request: TrainingRequest):
+    if agent.training_stats['is_training']:
+        raise HTTPException(status_code=400, detail="Training already in progress")
+    
+    agent.set_parameters(alpha=request.alpha, gamma=request.gamma, eps=request.eps)
+    
+    # Start training in background
+    agent.training_task = asyncio.create_task(
+        agent.train_async(min(request.episodes, 10000))
+    )
+    
+    return {
+        "status": "training_started",
+        "episodes": request.episodes,
+        "current_stats": agent.get_training_stats()
+    }
 
-@app.route('/train', methods=['POST'])
-def train():
-    data = request.json
-    episodes = min(data.get('episodes', 1000), 5000)
-    agent.train(episodes)
-    return jsonify({'status': 'completed', 'episodes': episodes})
+@app.get("/training_status")
+async def get_training_status():
+    return agent.get_training_stats()
+
+@app.get("/q_values")
+async def get_q_values():
+    state = tuple(game_env.board)
+    q_values = {}
+    
+    for action in range(9):
+        q_values[action] = agent.Q.get((state, action), 0.0)
+    
+    return q_values
+
+@app.get("/agent_status")
+async def get_agent_status():
+    return {
+        "trained": agent.trained,
+        "q_table_size": len(agent.Q),
+        "eps": agent.eps,
+        "alpha": agent.alpha,
+        "gamma": agent.gamma
+    }
+
+@app.post("/reset_training")
+async def reset_training():
+    if agent.training_task and not agent.training_task.done():
+        agent.training_task.cancel()
+    
+    agent.Q.clear()
+    agent.training_stats = {
+        'episodes_completed': 0,
+        'total_episodes': 0,
+        'wins': 0,
+        'losses': 0,
+        'draws': 0,
+        'win_rate': 0.0,
+        'avg_reward': 0.0,
+        'is_training': False
+    }
+    agent.trained = False
+    agent.eps = 0.1
+    return {"status": "training_reset"}
 
 # Vercel handler
 def handler(request):
     return app(request.environ, lambda *args: None)
-
-if __name__ == '__main__':
-    app.run(debug=True)
