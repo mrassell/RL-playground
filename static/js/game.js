@@ -154,7 +154,7 @@ class TicTacToeGame {
 
     async makeMove(position) {
         try {
-            const response = await fetch('http://localhost:5002/move', {
+            const response = await fetch('/move', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -241,7 +241,7 @@ class TicTacToeGame {
 
     async resetGame() {
         try {
-            const response = await fetch('http://localhost:5002/reset', {
+            const response = await fetch('/reset', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -311,7 +311,7 @@ class TicTacToeGame {
             this.status.textContent = 'Training in progress...';
             this.progressText.textContent = 'Training...';
             
-            const response = await fetch('http://localhost:5002/train', {
+            const response = await fetch('/train', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -358,7 +358,7 @@ class TicTacToeGame {
         // Poll every 500ms for updates
         this.trainingInterval = setInterval(async () => {
             try {
-                const response = await fetch('http://localhost:5002/training_status');
+                const response = await fetch('/training_status');
                 const stats = await response.json();
                 
                 console.log('📊 Polling update:', stats);
@@ -624,7 +624,7 @@ class TicTacToeGame {
 
     async loadExistingTrainingData() {
         try {
-            const response = await fetch('http://localhost:5002/training_status');
+            const response = await fetch('/training_status');
             const stats = await response.json();
             
             if (stats.episodes_completed > 0) {
@@ -840,7 +840,7 @@ class TicTacToeGame {
 
     async updateQValueHeatmap() {
         try {
-            const response = await fetch('http://localhost:5002/q_values');
+            const response = await fetch('/q_values');
             const qValues = await response.json();
             
             const qCells = document.querySelectorAll('.q-cell');
@@ -1003,7 +1003,7 @@ class TicTacToeGame {
 
     async checkAITrainingStatus() {
         try {
-            const response = await fetch('http://localhost:5002/training_status');
+            const response = await fetch('/training_status');
             const stats = await response.json();
             
             // Check if AI is trained (has Q-values)

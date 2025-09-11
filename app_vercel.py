@@ -1,4 +1,5 @@
 from flask import Flask, render_template, request, jsonify
+from flask_cors import CORS
 import numpy as np
 import random
 from collections import defaultdict
@@ -6,6 +7,7 @@ import json
 import time
 
 app = Flask(__name__)
+CORS(app)
 
 # -------------------------------
 # Tic Tac Toe Environment
@@ -256,6 +258,34 @@ def get_q_values():
         q_values[action] = agent.Q.get((state, action), 0.0)
     
     return jsonify(q_values)
+
+@app.route('/agent_status', methods=['GET'])
+def get_agent_status():
+    return jsonify({
+        'trained': agent.trained,
+        'q_table_size': len(agent.Q),
+        'eps': agent.eps,
+        'alpha': agent.alpha,
+        'gamma': agent.gamma
+    })
+
+@app.route('/reset_training', methods=['POST'])
+def reset_training():
+    global agent
+    agent.Q.clear()
+    agent.training_stats = {
+        'episodes_completed': 0,
+        'total_episodes': 0,
+        'wins': 0,
+        'losses': 0,
+        'draws': 0,
+        'win_rate': 0.0,
+        'avg_reward': 0.0,
+        'is_training': False
+    }
+    agent.trained = False
+    agent.eps = 0.1
+    return jsonify({'status': 'training_reset'})
 
 # Vercel entry point
 def handler(request):
