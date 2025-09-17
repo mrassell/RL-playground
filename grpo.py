@@ -340,3 +340,93 @@ class DistillationTrainer:
         final_loss = total_loss / num_epochs
         print(f"✅ Distillation complete! Final loss: {final_loss:.4f}")
         return final_loss
+    
+    def distill_with_chart(self, num_epochs=10, num_samples=5000, progress_placeholder=None, logs_container=None):
+        """Distill minimax knowledge into policy with real-time accuracy chart."""
+        states, actions = self.generate_training_data(num_samples)
+        
+        if len(states) == 0:
+            print("❌ No training data generated!")
+            return 0.0
+        
+        print(f"📚 Starting distillation with {len(states)} samples for {num_epochs} epochs...")
+        
+        # Convert to numpy arrays first to avoid the warning
+        states_array = np.array(states)
+        actions_array = np.array(actions)
+        
+        states = torch.FloatTensor(states_array)
+        actions = torch.LongTensor(actions_array)
+        
+        total_loss = 0.0
+        accuracy_data = []
+        
+        for epoch in range(num_epochs):
+            epoch_loss = 0.0
+            correct_predictions = 0
+            
+            for i in range(len(states)):
+                state = states[i].unsqueeze(0)
+                action = actions[i]
+                
+                # Get action mask
+                action_mask = (state == 0).float()
+                logits = self.policy(state)
+                masked_logits = logits - (1 - action_mask) * 1e9
+                
+                # Compute loss
+                loss = self.criterion(masked_logits, action.unsqueeze(0))
+                
+                # Update
+                self.optimizer.zero_grad()
+                loss.backward()
+                self.optimizer.step()
+                
+                epoch_loss += loss.item()
+                
+                # Check if prediction is correct
+                predicted_action = torch.argmax(masked_logits, dim=-1).item()
+                if predicted_action == action.item():
+                    correct_predictions += 1
+            
+            accuracy = correct_predictions / len(states)
+            avg_loss = epoch_loss / len(states)
+            total_loss += avg_loss
+            accuracy_data.append(accuracy)
+            
+            print(f"Epoch {epoch + 1}/{num_epochs}: Loss={avg_loss:.4f}, Accuracy={accuracy:.2%}")
+            
+            # Update real-time chart
+            if progress_placeholder is not None:
+                import plotly.graph_objects as go
+                fig = go.Figure()
+                fig.add_trace(go.Scatter(
+                    y=accuracy_data, 
+                    mode='lines+markers', 
+                    name='Distillation Accuracy',
+                    line=dict(color='#ff6b6b', width=3),
+                    marker=dict(size=8, color='#ff6b6b')
+                ))
+                fig.update_layout(
+                    title='Live Distillation Accuracy',
+                    template='plotly_dark',
+                    height=300,
+                    margin=dict(l=20, r=20, t=40, b=20),
+                    paper_bgcolor='rgba(0,0,0,0)',
+                    plot_bgcolor='rgba(0,0,0,0)',
+                    xaxis_title="Epoch",
+                    yaxis_title="Accuracy",
+                    font=dict(color='white')
+                )
+                fig.update_xaxes(gridcolor='rgba(255,255,255,0.1)')
+                fig.update_yaxes(gridcolor='rgba(255,255,255,0.1)')
+                
+                progress_placeholder.plotly_chart(fig, use_container_width=True)
+            
+            # Update logs
+            if logs_container is not None:
+                logs_container.write(f"**Epoch {epoch + 1}/{num_epochs}:** Loss: {avg_loss:.4f}, Accuracy: {accuracy:.2%}")
+        
+        final_loss = total_loss / num_epochs
+        print(f"✅ Distillation complete! Final loss: {final_loss:.4f}")
+        return final_loss
