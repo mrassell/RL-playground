@@ -1,0 +1,21 @@
+id,before_text,instruction,after_text
+6,user_name: alice,Rename field to 'username',username: alice
+12,<div>Content</div>,Add CSS class 'container' to div,<div class='container'>Content</div>
+2,"2024/1/7, amount: 13",Format date as YYYY-MM-DD,"2024-01-07, amount: 13"
+30,email: user@domain.com,Extract domain from email,email: domain.com
+22,value: 100,Multiply value by 2,value: 200
+3,title\tHello\tworld,Replace tabs with 4 spaces,title    Hello    world
+31,text: goodbye,Add farewell suffix,text: goodbye bye
+37,value: 50,Add percentage sign,value: 50%
+4,color: grey,Change british 'grey' to 'gray',color: gray
+36,<div>Content</div>,Add closing tag comment,<div>Content</div><!-- End div -->
+24,<span>Text</span>,Add id attribute to span,<span id='text'>Text</span>
+33,count: 5,Decrement count by 1,count: 4
+11,name: bob\nage: 25\ncity: london,Capitalize all field values,name: Bob\nage: 25\ncity: London
+23,text: hello,Add greeting prefix,text: Hi hello
+19,<p>Paragraph</p>,Add line break after paragraph,<p>Paragraph</p>\n
+21,name: charlie\nage: 30,Add new field 'occupation: developer',name: charlie\nage: 30\noccupation: developer
+8,email: test@example.com,Add validation comment above email field,# Email validation required\nemail: test@example.com
+15,url: http://example.com,Change protocol to https,url: https://example.com
+29,price: 99.99,Add currency symbol,price: $99.99
+39,<p>First</p><p>Second</p>,Add separator between paragraphs,<p>First</p>\n---\n<p>Second</p>

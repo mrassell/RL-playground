@@ -1,0 +1,21 @@
+id,before_text,instruction,after_text
+20,color: red,Change color to blue,color: blue
+17,title: My Title,Add exclamation mark to title,title: My Title!
+16,phone: 123-456-7890,Remove dashes from phone number,phone: 1234567890
+27,name: david\nage: 35\ncity: paris,Capitalize city name only,name: david\nage: 35\ncity: Paris
+5,<h1>Title</h1>\n<p>Body</p>,Add footer line '--- end ---' at the end,<h1>Title</h1>\n<p>Body</p>\n--- end ---
+13,value: 123.45,Round value to nearest integer,value: 123
+38,text: hello world,Replace 'world' with 'universe',text: hello universe
+28,<h2>Subtitle</h2>,Change h2 to h3,<h3>Subtitle</h3>
+40,status: new,Change status to 'in_progress',status: in_progress
+7,price: $10.50,Remove dollar sign from price,price: 10.50
+26,date: 2024-12-25,Extract year from date,date: 2024
+10,date: 2024-01-01,Format date as MM/DD/YYYY,date: 01/01/2024
+14,text: hello world,Convert text to uppercase,text: HELLO WORLD
+32,<img src='photo.jpg'>,Add alt attribute to image,<img src='photo.jpg' alt='Photo'>
+35,name: eve\nage: 28,Add age validation comment,name: eve\n# Age must be 18+\nage: 28
+9,status: active,Change status to 'enabled',status: enabled
+18,count: 0,Increment count by 1,count: 1
+25,status: pending,Change status to 'completed',status: completed
+1,name: john\nage: 21,Capitalize the name field value,name: John\nage: 21
+34,url: https://site.com/page,Extract domain from URL,url: site.com
