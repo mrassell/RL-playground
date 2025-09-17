@@ -5,5 +5,4 @@ matplotlib
 streamlit
 plotly
 python-Levenshtein
-difflib
 scikit-learn
