@@ -159,8 +159,112 @@ def get_agent_move():
     return None
 
 # Main UI
-st.title("GRPO Reinforcement Learning Demonstration")
+# Title with documentation button
+col_title, col_btn = st.columns([4, 1])
+with col_title:
+    st.title("GRPO Reinforcement Learning Demonstration")
+with col_btn:
+    st.markdown("<br>", unsafe_allow_html=True)  # Add some spacing
+    if st.button("Documentation"):
+        st.session_state.show_docs = True
+
 st.markdown("### Group Relative Policy Optimization for Tic-Tac-Toe")
+
+# Check if we should show documentation
+if st.session_state.get('show_docs', False):
+    st.markdown("---")
+    st.markdown("## How This Actually Works")
+    
+    st.markdown("""
+    This implementation demonstrates the application of Group Relative Policy Optimization (GRPO) to the domain of deterministic game playing, specifically Tic-Tac-Toe. The system combines reinforcement learning with expert knowledge distillation to achieve optimal performance.
+    
+    ### Group Relative Policy Optimization Algorithm
+    
+    GRPO operates on the principle of relative ranking rather than absolute reward optimization. The algorithm collects K episodes through policy rollouts, where each episode represents a complete game trajectory. Episodes are scored based on terminal outcomes: +1 for wins, 0 for draws, and -1 for losses.
+    
+    The core mathematical formulation involves computing advantages for each episode:
+    
+    ```
+    advantage_i = R_i - R_baseline
+    ```
+    
+    where R_i is the return of episode i and R_baseline is the mean return across all episodes. This creates a ranking system where episodes exceeding the baseline receive positive advantages, while underperforming episodes receive negative advantages.
+    
+    The policy update uses these advantages as importance weights in the policy gradient:
+    
+    ```
+    L = -Σ(advantage_i * log π(a_i|s_i))
+    ```
+    
+    This formulation ensures that actions from high-performing episodes are reinforced while actions from poor episodes are discouraged, creating a self-improving learning loop.
+    
+    ### Minimax Algorithm and Optimality
+    
+    The minimax algorithm represents the theoretical optimum for deterministic, zero-sum games with perfect information. For Tic-Tac-Toe, minimax provides a provably optimal strategy through recursive game tree search.
+    
+    The algorithm operates on the principle of maximizing the minimum guaranteed outcome:
+    
+    ```
+    minimax(state, player) = {
+        utility(state) if terminal(state)
+        max(minimax(result(state, action), opponent)) if player = MAX
+        min(minimax(result(state, action), player)) if player = MIN
+    }
+    ```
+    
+    This recursive formulation ensures that the algorithm considers all possible future states and selects moves that guarantee the best possible outcome against optimal opposition. The computational complexity is O(b^d) where b is the branching factor and d is the depth of the game tree.
+    
+    ### Knowledge Distillation Process
+    
+    Distillation transfers the optimal policy from minimax to a neural network through supervised learning. The process generates a dataset D = {(s_i, a_i*)} where s_i represents board states and a_i* represents optimal actions from minimax.
+    
+    The neural network is trained using cross-entropy loss:
+    
+    ```
+    L_distill = -Σ log π_θ(a_i*|s_i)
+    ```
+    
+    This objective function ensures that the neural network learns to approximate the minimax policy across the entire state space. The training process uses Adam optimization with learning rate scheduling to ensure convergence.
+    
+    ### Theoretical Guarantees and Convergence
+    
+    The combination of GRPO training followed by minimax distillation provides strong theoretical guarantees. Since minimax is provably optimal for Tic-Tac-Toe, any policy that successfully approximates minimax will also be optimal.
+    
+    The distillation process ensures that the neural network learns to make identical decisions to minimax across all possible board configurations. This means that after successful distillation, the policy will never lose a game of Tic-Tac-Toe, regardless of the opponent's strategy.
+    
+    ### Implementation Architecture
+    
+    The policy network consists of a multi-layer perceptron with the following architecture:
+    - Input layer: 9-dimensional vector representing board state
+    - Hidden layers: 3 layers with 128 neurons each
+    - Output layer: 9-dimensional vector representing action logits
+    - Activation: ReLU for hidden layers, softmax for output
+    
+    Action masking prevents illegal moves by setting logits of invalid actions to large negative values before applying softmax. The network uses dropout regularization and L2 weight decay to prevent overfitting.
+    
+    The GRPO training loop alternates between episode collection and policy updates. Episode collection involves rolling out the current policy against various opponents to generate diverse experience. Policy updates compute advantages, apply them as importance weights, and update network parameters using Adam optimization.
+    
+    ### Computational Complexity and Scalability
+    
+    The implementation runs efficiently on CPU with training times under 30 seconds for complete GRPO training. The small state space of Tic-Tac-Toe (3^9 = 19,683 possible states) allows for exhaustive analysis and rapid convergence.
+    
+    The principles demonstrated here scale to more complex domains. The GRPO algorithm can be applied to any environment with discrete actions and clear reward signals. The distillation approach generalizes to any domain where expert policies are available.
+    
+    ### Connection to Modern AI Systems
+    
+    This implementation mirrors the two-stage training paradigm used in large language models. The GRPO phase corresponds to pre-training, where models learn general patterns from data. The distillation phase corresponds to fine-tuning, where models specialize for specific tasks using expert demonstrations.
+    
+    The key insight is that combining learning from experience (reinforcement learning) with learning from expert demonstrations (supervised learning) can achieve superhuman performance. This hybrid approach is fundamental to modern AI systems achieving optimal performance across diverse domains.
+    """)
+    
+    # Back to Demo button - only shown in documentation view
+    col1, col2, col3 = st.columns([1, 1, 1])
+    with col2:
+        if st.button("Back to Demo", use_container_width=True):
+            st.session_state.show_docs = False
+            st.rerun()
+    
+    st.stop()  # Stop execution here to show only documentation
 
 # Demonstration Guide
 st.markdown("""
@@ -547,4 +651,4 @@ else:
 
 # Footer
 st.markdown("---")
-st.markdown("**GRPO Reinforcement Learning Demonstration** - Academic Research Tool")
+st.markdown("**GRPO Reinforcement Learning Demonstration**")
